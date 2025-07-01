@@ -3,7 +3,9 @@ package com.security.spring_jwt_demo.service;
 import com.security.spring_jwt_demo.dto.LoginRequest;
 import com.security.spring_jwt_demo.dto.LoginResponse;
 import com.security.spring_jwt_demo.dto.RegisterRequest;
+import com.security.spring_jwt_demo.model.Role;
 import com.security.spring_jwt_demo.model.User;
+import com.security.spring_jwt_demo.repository.RoleRepository;
 import com.security.spring_jwt_demo.repository.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,6 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Service
 public class AuthService {
 
@@ -22,12 +29,14 @@ public class AuthService {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final RoleRepository roleRepository;
 
-    public AuthService(AuthenticationManager authenticationManager, JwtService jwtService, UserRepository userRepository, BCryptPasswordEncoder passwordEncoder) {
+    public AuthService(AuthenticationManager authenticationManager, JwtService jwtService, UserRepository userRepository, BCryptPasswordEncoder passwordEncoder, RoleRepository roleRepository) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.roleRepository = roleRepository;
     }
 
     public LoginResponse login(LoginRequest loginRequest) {
@@ -47,18 +56,24 @@ public class AuthService {
 
     public String register(RegisterRequest registerRequest) {
         if (userRepository.findUserByUsername(registerRequest.getUsername()).isPresent()) {
-            return "Username already in use";  //maybe create a Response format
+            return "Username already in use";
         }
-//        if (member.getRoles() == null || member.getRoles().isEmpty()) {
-//            member.setRoles(new HashSet<>(List.of("ROLE_MEMBER")));
-//        }
+
+        if (registerRequest.getRoles() == null || registerRequest.getRoles().isEmpty()) {
+            registerRequest.setRoles(Set.of("USER"));
+        }
+
+        Set<Role> userRoles = registerRequest.getRoles().stream()
+                .map(roleName -> roleRepository.findByName(roleName)
+                        .orElseThrow(() -> new RuntimeException("Role not found: " + roleName)))
+                .collect(Collectors.toSet());
 
         String encodedPassword = passwordEncoder.encode(registerRequest.getPassword());
-        registerRequest.setPassword(encodedPassword);
 
+        User newUser = new User(registerRequest.getUsername(), encodedPassword, userRoles);
+        userRepository.save(newUser);
 
-        userRepository.save(new User(registerRequest.getUsername(), registerRequest.getPassword()));
-        return "Member registered succesfully";
+        return "Member registered successfully";
     }
 
 }
