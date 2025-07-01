@@ -1,6 +1,11 @@
 package com.security.spring_jwt_demo.config;
 
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,26 +24,49 @@ import org.springframework.security.web.SecurityFilterChain;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
 import java.util.Base64;
 
 @Configuration
 public class SecurityConfig {
     // For Symmetric key
-    @Value("${security.jwt.secret}")
-    private String secretKey;
+//    @Value("${security.jwt.secret}")
+//    private String secretKey;
+
+    @Value("${security.jwt.private-key}")
+    private RSAPrivateKey privateKey;
+
+    @Value("${security.jwt.public-key}")
+    private RSAPublicKey publicKey;
+
+
+//    @Bean
+//    public JwtDecoder jwtDecoder() {
+//        byte[] secretBytes = Base64.getDecoder().decode(secretKey.getBytes());
+//        SecretKey hmacKey = new SecretKeySpec(secretBytes, "HmacSHA256");
+//        return NimbusJwtDecoder.withSecretKey(hmacKey).build();
+//    }
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        byte[] secretBytes = Base64.getDecoder().decode(secretKey.getBytes());
-        SecretKey hmacKey = new SecretKeySpec(secretBytes, "HmacSHA256");
-        return NimbusJwtDecoder.withSecretKey(hmacKey).build();
+        return NimbusJwtDecoder.withPublicKey(publicKey).build();
     }
+
+//    @Bean
+//    public JwtEncoder jwtEncoder() {
+//        byte[] secretBytes = Base64.getDecoder().decode(secretKey.getBytes());
+//        SecretKey hmacKey = new SecretKeySpec(secretBytes, "HmacSHA256");
+//        return new NimbusJwtEncoder(new ImmutableSecret<>(hmacKey));
+//    }
 
     @Bean
     public JwtEncoder jwtEncoder() {
-        byte[] secretBytes = Base64.getDecoder().decode(secretKey.getBytes());
-        SecretKey hmacKey = new SecretKeySpec(secretBytes, "HmacSHA256");
-        return new NimbusJwtEncoder(new ImmutableSecret<>(hmacKey));
+        RSAKey rsa = new RSAKey.Builder(publicKey)
+                .privateKey(privateKey)
+                .build();
+        JWKSource<SecurityContext> jwtks = new ImmutableJWKSet<>(new JWKSet(rsa));
+        return new NimbusJwtEncoder(jwtks);
     }
 
     @Bean
